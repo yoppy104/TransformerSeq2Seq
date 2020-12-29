@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Embedder(nn.Module):
+    # 引数に学習済み重みパラメータを入れる
     def __init__(self, text_embedding_vectors, pad_idx=0):
         super(Embedder, self).__init__()
 
