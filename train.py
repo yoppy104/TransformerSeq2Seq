@@ -10,11 +10,6 @@ from soft_argmax import *
 from evaluate import *
 
 from generator import *
-from discriminator import *
-from loss_net import *
-from loss_g import *
-from loss_d import *
-from loss_encdec import * 
 
 from bleu import BLEU
 
@@ -36,7 +31,7 @@ class Train:
         self.test_data_num = 200
 
         # calcurate device
-        self.device = torch.device("cuda:0")
+        self.device = DEVICE
             
         # num of vocablary
         self.vocab_size = len(self.train_transform.w2i)
@@ -46,64 +41,13 @@ class Train:
         self.connect_char_tensor = torch.tensor([self.train_transform.w2i[CONNECT_SYMBOL] for i in range(BATCH_SIZE)]).unsqueeze(1).to(self.device)
 
         # model
-        self.encdec_loss = EncDecLoss(self.device)
         self.bce_loss = nn.CrossEntropyLoss(ignore_index=0)
-        self.generator = AttentionGenerator(self.train_transform, self.vocab_size, self.device, self.train_max_length_s, self.train_max_length_t, self.bce_loss, self.emb_vec, False)
-        # self.discriminator = CNNDiscriminator(EMBEDDING_DIM, self.vocab_size, 0, self.device, gpu=True).to(self.device)
-        # self.discriminator = LSTMDiscriminator(EMBEDDING_DIM, HIDDEN_DIM, self.vocab_size, self.train_max_length_s+self.train_max_length_t, 0, self.device)
-        self.discriminator = EncDecDiscriminator(EMBEDDING_DIM, HIDDEN_DIM, self.vocab_size, self.train_max_length_s+self.train_max_length_t, 0, self.device)
-
+        self.generator = Generator(self.vocab_size, self.emb_vec)
+       
         self.blue = BLEU(4)
-
-        # initialize param of model
-        if IS_LOAD_GEN_MODEL:
-            self.generator.load_state_dict(torch.load(LOAD_GEN_MODEL_PATH))
-        else:
-            self.generator.init_params()
-        if IS_LOAD_DISC_MODEL:
-            self.discriminator.load_state_dict(torch.load(LOAD_DISC_MODEL_PATH))
-        else:
-            self.discriminator.init_params()
-
-        # loss function
-        self.criterion_g = GLoss()
-        # self.criterion_d = DLoss()
-        self.criterion_d = GANLoss()
-
-        self.criterion_net = nn.CrossEntropyLoss()
-
-        self.loss_net = LossNet(EMBEDDING_DIM, HIDDEN_DIM, self.vocab_size, 0, self.device).to(self.device)
-        if IS_LOAD_NET_MODEL:
-            self.loss_net.load_state_dict(torch.load(LOAD_NET_MODEL_PATH))
-            for param in self.loss_net.parameters():
-                param.requires_grad = False
-        else:
-            self.loss_net.init_params()
-
-
-        if IS_LOAD_EMB_MODEL:
-            self.generator.encoder.embeddings.load_state_dict(torch.load(LOAD_EMB_MODEL_PATH))
-            self.generator.decoder.embeddings.load_state_dict(torch.load(LOAD_EMB_MODEL_PATH))
-            self.discriminator.enc_embeddings.load_state_dict(torch.load(LOAD_EMB_MODEL_PATH))
-            self.discriminator.dec_embeddings.load_state_dict(torch.load(LOAD_EMB_MODEL_PATH))
-            for param in self.generator.encoder.embeddings.parameters():
-                param.requires_grad = False
-            for param in self.generator.decoder.embeddings.parameters():
-                param.requires_grad = False
-            for param in self.discriminator.enc_embeddings.parameters():
-                param.requires_grad = False
-            for param in self.discriminator.dec_embeddings.parameters():
-                param.requires_grad = False
-
-        
 
         # optimizer
         self.optimizer_gen = torch.optim.Adam(self.generator.parameters(), lr=START_LEARNING_RATE_G, betas=(0.5, 0.999))
-        self.optimizer_disc = torch.optim.Adam(self.discriminator.parameters(), lr=START_LEARNING_RATE_D, betas=(0.5, 0.999))
-        self.optimizer_net = torch.optim.Adam(self.loss_net.parameters(), lr=1e-4, betas=(0.5, 0.999))
-
-        # self.optimizer_enc = torch.optim.Adam(self.generator.encoder.parameters(), lr=START_LEARNING_RATE_G, betas=(0.5, 0.999))
-        # self.optimizer_dec = torch.optim.Adam(self.generator.decoder.parameters(), lr=START_LEARNING_RATE_G, betas=(0.5, 0.999))
 
         self.one = torch.tensor(1, dtype=torch.float).to(self.device)
         self.mone = (self.one * -1).to(self.device)
@@ -362,12 +306,15 @@ class Train:
 
                 input_tensor = data[0].to(self.device)
                 target_tensor = data[1].to(self.device)
+                src = target_tensor[:, :-1]
+                tgt = target_tensor[:, 1:]
 
                 z = self.generate_z()
 
                 # Encoder-Decoder
-                loss = self.generator(input_tensor, target_tensor, z)
-                loss.backward() # BinaryCrossEntropy loss
+                out = self.generator(input_tensor, src)
+                print(out.size())
+                
 
                 # gradient cliping
                 self.generator.clip_weight(CLIP_RATE)

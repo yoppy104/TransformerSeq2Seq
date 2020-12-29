@@ -2,6 +2,7 @@ import os
 import torch
 import datetime
 from enum import Enum
+from json_manager import readJson2Dict
 
 # 学習率の変動仕様
 class LRType(Enum):
@@ -9,46 +10,53 @@ class LRType(Enum):
     SEQUENCE = "sequence"
     STEP = "step"
 
+
 """
 Constant value
 """
 IS_COLAB = False    # flag of using GoogleColab
 
+# root path with GoogleColab
+root_path = ""
+if IS_COLAB:
+    root_path = "/content/drive/My Drive/Seq2SeqGAN-Colab/"
+
+params = readJson2Dict(root_path + "data/params.dat")
+
+# experience directory
+#　―　daytime when begining experience
+#　　　－　output directory
 TIME_STAMP = str(datetime.date.today())
 EXPERIENCE_NAME = "0EX_" + "emb_word2vec"
 RUN_NAME = TIME_STAMP + "-" + EXPERIENCE_NAME
 
-DEVICE = torch.device("cuda")
+EMBEDDING_DIM   = params["EMBEDDING_DIM"]       # embedding word vector dimension num
+HIDDEN_DIM      = params["HIDDEN_DIM"]          # lstm hidden dimension num
+BATCH_SIZE      = params["BATCH_SIZE"]          # mini batch size
 
-EMBEDDING_DIM = 192 # embedding word vector dimension num
+MAIN_EPOCHS     = params["MAIN_EPOCHS"]         # num epochs of main train
+PRE_G_EPOCHS    = params["PRETRAIN_G_EPOCHS"]   # num epochs of generator pretrain
+PRE_D_EPOCHS    = params["PRETRAIN_D_EPOCHS"]   # num epochs of discriminator pretrain
 
-HIDDEN_DIM = 512    # lstm hidden dimension num
+IS_PRETRAIN_G   = True      # flag of using pretrain generator
+IS_PRETRAIN_D   = True      # flag of using pretrain discriminator
 
-BATCH_SIZE = 256   # mini batch size
+CLIP_RATE       = 0.2       # rate of gradient clipping
 
-MAIN_EPOCHS = 4000    # num epochs of main train
-PRE_G_EPOCHS = 4000    # num epochs of generator pretrain
-PRE_D_EPOCHS = 1500    # num epochs of discriminator pretrain
+DOES_USE_TEACHER_FORCING    = False                             # flag of using teacher forcing
+TEACHER_FORCING_RATE        = params["TEACHER_FORCING_RATE"]    # rate of using teacher forcing
 
-IS_PRETRAIN_G = True
-IS_PRETRAIN_D = True
+DISC_TRAIN_INTERVAL         = 1     # discriminator train ratio
 
-CLIP_RATE = 0.2     # rate of gradient clipping
+IS_REVERSE = False      # flag of using reverse data
 
-DOES_USE_TEACHER_FORCING = False # flag of using teacher forcing
-TEACHER_FORCING_RATE = 0      # rate of using teacher forcing
+IS_TRAIN_D_WHEN_TRAINING_G = False            # flag Disciminator train when generator training
 
-DISC_TRAIN_INTERVAL = 1      # discriminator train ratio
-
-IS_REVERSE = False           # flag of using reverse data
-
-IS_TRAIN_D_WHEN_TRAINING_G = False
-
-BEGIN_SYMBOL = "<s>"        # symbol char, which mean begining of sentence.
-END_SYMBOL = "</s>"         # symbol char, which mean ending of sentence.
-PAD_SYMBOL = "<pad>"        # symbol char, which mean padding of sentence.
-UNKNOWN_SYMBOL = "<unk>"    # symbol char, which mean unknown char.
-CONNECT_SYMBOL = "<=?=>"    # connect symbol
+BEGIN_SYMBOL    = params["BEGIN_SYMBOL"]      # symbol char, which mean begining of sentence.
+END_SYMBOL      = params["END_SYMBOL"]        # symbol char, which mean ending of sentence.
+PAD_SYMBOL      = params["PAD_SYMBOL"]        # symbol char, which mean padding of sentence.
+UNKNOWN_SYMBOL  = params["UNKNOWN_SYMBOL"]    # symbol char, which mean unknown char.
+CONNECT_SYMBOL  = params["CONNECT_SYMBOL"]    # connect symbol
 
 SAMPLE_INTERVAL = 10   # output sample ratio of epoch
 
@@ -84,22 +92,10 @@ elif LR_MANAGEMENT_TYPE == LRType.STEP:
 """
 Path data
 """
-if IS_COLAB:
-    # DATA_SET_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/duc_text.txt"                        # train dataset file path
-    # TEST_SET_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/duc_text.txt"                         # test dataset file path
-    DATA_SET_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/train_set_99.csv"                        # train dataset file path
-    TEST_SET_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/train_set_99.csv"                         # test dataset file path
-    DISC_TRAIN_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/train_loss_set.csv"
-    DISC_TEST_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/test_loss_set.csv"
-    EMB_VEC_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/data/emb_weight.vec"
-else:
-    DATA_SET_PATH = "data/duc_text.txt"                        # train dataset file path
-    TEST_SET_PATH = "data/duc_text.txt"                         # test dataset file path
-    # DATA_SET_PATH = "data/train_set_99.csv"                        # train dataset file path
-    # TEST_SET_PATH = "data/train_set_99.csv"                         # test dataset file path
-    DISC_TRAIN_PATH = "data/train_loss_set.csv"
-    DISC_TEST_PATH = "data/test_loss_set.csv"
-    EMB_VEC_PATH = "data/emb_weight.vec"
+
+DATA_SET_PATH = root_path + "data/" + params["TRAIN_DATA"]
+TEST_SET_PATH = root_path + "data/" + params["TEST_DATA"]
+EMB_VEC_PATH = root_path + "data/" + params["EMB_WEIGHT"]
 
 
 if IS_COLAB:
@@ -183,36 +179,24 @@ else:
     LOSS_NET_MODEL_PATH = ["save_param", TIME_STAMP+"-"+CLOCK_STAMP, "net_model.pth"]
     EMBEDDING_MODEL_PATH = ["save_param", TIME_STAMP+"-"+CLOCK_STAMP, "emb_model.pth"]
 
-if IS_COLAB:
-    LOAD_GEN_MODEL_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/params/gen_model.pth"
-    LOAD_DISC_MODEL_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/params/disc_model.pth"
-    LOAD_NET_MODEL_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/params/net_model.pth"
-    LOAD_EMB_MODEL_PATH = "/content/drive/My Drive/Seq2SeqGAN-Colab/params/emb_model.pth"
-else:
-    LOAD_GEN_MODEL_PATH = "params/gen_model.pth"
-    LOAD_DISC_MODEL_PATH = "params/disc_model.pth"
-    LOAD_NET_MODEL_PATH = "params/net_model.pth"
-    LOAD_EMB_MODEL_PATH = "params/emb_model.pth"
 
-IS_LOAD_GEN_MODEL = False   # flag of loading generator model
-IS_LOAD_DISC_MODEL = False  # flag of loading discriminator model
-IS_LOAD_NET_MODEL = False   # flag of loading loss_net model
-IS_LOAD_EMB_MODEL = False   # flag of loading embedding model
+LOAD_GEN_MODEL_PATH = root_path + "params/gen_model.pth"
+LOAD_DISC_MODEL_PATH = root_path + "params/disc_model.pth"
+LOAD_NET_MODEL_PATH = root_path + "params/net_model.pth"
+LOAD_EMB_MODEL_PATH = root_path + "params/emb_model.pth"
+
+IS_LOAD_GEN_MODEL = params["LOAD_GEN"]   # flag of loading generator model
+IS_LOAD_DISC_MODEL = params["LOAD_DISC"]  # flag of loading discriminator model
+IS_LOAD_EMB_MODEL = params["LOAD_EMB"]   # flag of loading embedding model
 
 
 # translate row path data(list) to input path data(str, joint)
 def make_path(path_list, append=""):
     make_dir(path_list)
     if append == "":
-        if IS_COLAB:
-            return "/content/drive/My Drive/Seq2SeqGAN-Colab/results" + "/" + "/".join(path_list)
-        else:
-            return EXPERIENCE_NAME + "/" + "/".join(path_list)
+        return root_path + EXPERIENCE_NAME + "/" + "/".join(path_list)
     else:
-        if IS_COLAB:
-            out = "/content/drive/My Drive/Seq2SeqGAN-Colab/results" + "/" + "/".join(path_list)
-        else:
-            out = EXPERIENCE_NAME + "/" + "/".join(path_list)
+        out = root_path + EXPERIENCE_NAME + "/" + "/".join(path_list)
         ind = out.find(".")
         temp = out[ind:-1]
         out = out.replace(temp, append+temp)
@@ -220,10 +204,7 @@ def make_path(path_list, append=""):
 
 
 def make_dir(path_list):
-    if IS_COLAB:
-        dir_name = "/content/drive/My Drive/Seq2SeqGAN-Colab/results/" + EXPERIENCE_NAME
-    else:
-        dir_name = EXPERIENCE_NAME
+    dir_name = root_path + EXPERIENCE_NAME
     slash = "/"
     for i in range(len(path_list)-1):
         dir_name += slash + path_list[i]

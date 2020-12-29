@@ -285,7 +285,8 @@ def LoadEmbVec(file_path, transform, vocab_size):
         content = datas[1:]
         for i in range(len(content)):
             content[i] = float(content[i])
-        emb_dict[transform.w2i[word]] = torch.tensor(content)
+        if word in transform.w2i.keys():
+            emb_dict[transform.w2i[word]] = torch.tensor(content)
     f.close()
 
     out = torch.zeros(vocab_size, EMBEDDING_DIM)
