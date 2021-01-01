@@ -8,11 +8,11 @@ class Attention(nn.Module):
     def __init__(self, d_model=300):
         super(Attention, self).__init__()
 
-        self.q_linear = nn.Linear(d_model, d_model)
-        self.v_linear = nn.Linear(d_model, d_model)
-        self.k_linear = nn.Linear(d_model, d_model)
+        self.q_linear = nn.Linear(d_model, d_model, bias=False)
+        self.v_linear = nn.Linear(d_model, d_model, bias=False)
+        self.k_linear = nn.Linear(d_model, d_model, bias=False)
 
-        self.out = nn.Linear(d_model, d_model)
+        self.out = nn.Linear(d_model, d_model, bias=False)
 
         self.d_k = d_model
 
@@ -29,10 +29,12 @@ class Attention(nn.Module):
 
         mask = mask.unsqueeze(1)
         weights = weights.masked_fill(mask==0, -1e9)
+        weights = weights[0, :, :, :]
 
         normlized_weights = F.softmax(weights, dim=-1)
 
         output = torch.matmul(normlized_weights, v)
+
 
         output = self.out(output)
 
@@ -41,13 +43,14 @@ class Attention(nn.Module):
 
     def init_params(self):
         for param in self.parameters():
-            torch.nn.init.xavier_normal_(param)
+            if param.dim() > 1:
+                torch.nn.init.xavier_normal_(param)
     
 
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, num_layer=3, d_model=300, device=None):
-        super(Attention, self).__init__()
+        super(MultiHeadAttention, self).__init__()
 
         if device == None:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -58,18 +61,24 @@ class MultiHeadAttention(nn.Module):
             [Attention(d_model=d_model) for i in range(num_layer)]
             )
 
-        self.out_layer = nn.Linear(d_model*num_layer, d_model)
+        self.out_layer = nn.Linear(d_model*num_layer, d_model, bias=False)
 
 
     def forward(self, q, k, v, mask):
-        out = torch.zeros(BATCH_SIZE, 1).to(self.device, non_blocking=True)
-        norm = torch.zeros(BATCH_SIZE, 1).to(self.device, non_blocking=True)
+        out = torch.zeros(q.size(0), q.size(1), 1).to(self.device, non_blocking=True)
+        norm = torch.zeros(q.size(0), q.size(1), 1).to(self.device, non_blocking=True)
         for attn in self.layers:
             attn_out, normalized = attn(q, k, v, mask)
-            out = torch.cat([out, attn_out], dim=1)
-            norm = torch.cat([norm, normalized], dim=1)
-        out = out[:, 1:]
-        norm = norm[:, 1:]
+            attn_out = attn_out.squeeze()
+            if attn_out.dim() < 3:
+                attn_out = attn_out.unsqueeze(0)
+            normalized = normalized.squeeze()
+            if normalized.dim() < 3:
+                normalized = normalized.unsqueeze(0)
+            out = torch.cat([out, attn_out], dim=2)
+            norm = torch.cat([norm, normalized], dim=2)
+        out = out[:, :, 1:]
+        norm = norm[:, :, 1:]
 
         out = self.out_layer(out)
 
