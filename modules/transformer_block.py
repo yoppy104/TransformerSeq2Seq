@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from attention import Attention
+from attention import MultiHeadAttention
 from feed_forward import FeedForward
 
 class TransformerBlock(nn.Module):
@@ -13,7 +13,7 @@ class TransformerBlock(nn.Module):
         self.norm_1 = nn.LayerNorm(d_model)
         self.norm_2 = nn.LayerNorm(d_model)
 
-        self.attn = Attention(d_model)
+        self.attn = MultiHeadAttention(d_model, 3)
 
         self.ff = FeedForward(d_model)
 

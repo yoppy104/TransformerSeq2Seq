@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from utils import *
 
 class Attention(nn.Module):
     def __init__(self, d_model=300):
@@ -14,6 +15,9 @@ class Attention(nn.Module):
         self.out = nn.Linear(d_model, d_model)
 
         self.d_k = d_model
+
+        # init parameters
+        self.init_params()
 
     
     def forward(self, q, k, v, mask):
@@ -33,3 +37,40 @@ class Attention(nn.Module):
         output = self.out(output)
 
         return output, normlized_weights
+
+
+    def init_params(self):
+        for param in self.parameters():
+            torch.nn.init.xavier_normal_(param)
+    
+
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, num_layer=3, d_model=300, device=None):
+        super(Attention, self).__init__()
+
+        if device == None:
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
+
+        self.layers = nn.ModuleList(
+            [Attention(d_model=d_model) for i in range(num_layer)]
+            )
+
+        self.out_layer = nn.Linear(d_model*num_layer, d_model)
+
+
+    def forward(self, q, k, v, mask):
+        out = torch.zeros(BATCH_SIZE, 1).to(self.device, non_blocking=True)
+        norm = torch.zeros(BATCH_SIZE, 1).to(self.device, non_blocking=True)
+        for attn in self.layers:
+            attn_out, normalized = attn(q, k, v, mask)
+            out = torch.cat([out, attn_out], dim=1)
+            norm = torch.cat([norm, normalized], dim=1)
+        out = out[:, 1:]
+        norm = norm[:, 1:]
+
+        out = self.out_layer(out)
+
+        return out, norm

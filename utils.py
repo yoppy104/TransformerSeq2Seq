@@ -23,6 +23,8 @@ if IS_COLAB:
 
 params = readJson2Dict(root_path + "data/params.dat")
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 # experience directory
 #　―　daytime when begining experience
 #　　　－　output directory
